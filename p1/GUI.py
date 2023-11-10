@@ -1,4 +1,5 @@
 import mysql.connector as msq
+import csv
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -6,238 +7,208 @@ from tkinter import ttk, messagebox
 cn = msq.connect(host='localhost', user='root', passwd='root', database='gym')
 cr = cn.cursor()
 
-# Create a table to display game data
-def create_table(parent_frame):
-    columns = ("GAME_NAME", "STORAGE", "RAM", "GRAPHIC_REQ", "GENRE", "DATE_OF_LAUNCH")
-    tree = ttk.Treeview(parent_frame, columns=columns, show="headings")
+# Create a Tkinter window
+root = tk.Tk()
+root.title("Gaming Arcade Management")
+root.geometry("800x400")
+root.configure(bg="#99FFFF")
 
-    for col in columns:
-        tree.heading(col, text=col)
-        tree.column(col, width=100)
-    tree.pack(fill="both", expand=True)
-    return tree
+# Open the CSV file for reading and writing
+csv_file_path = "data.csv"
+
+# Create a Frame for options on the left side
+options_frame = tk.Frame(root, bg="#99FFFF")
+options_frame.pack(side=tk.LEFT, padx=10, pady=10)
+
+# Create a Frame for the Treeview on the right side
+treeview_frame = tk.Frame(root, bg="#99FFFF")
+treeview_frame.pack(side=tk.RIGHT, padx=10, pady=10)
+
+# Create a Treeview widget to display the data in a tabular form
+tree = ttk.Treeview(treeview_frame, columns=("GameName", "Storage", "RAM", "GraphicReq", "Genre", "DateOfLaunch"))
+tree.heading("#1", text="Game Name")
+tree.heading("#2", text="Storage")
+tree.heading("#3", text="RAM")
+tree.heading("#4", text="Graphic Req")
+tree.heading("#5", text="Genre")
+tree.heading("#6", text="Date Of Launch")
+tree.pack()
+
+# Function to display data in the Treeview
+def display_data_in_treeview():
+    for record in tree.get_children():
+        tree.delete(record)
+    cmd = "SELECT * FROM GMAC"
+    cr.execute(cmd)
+    data = cr.fetchall()
+    for row in data:
+        tree.insert("", "end", values=row)
 
 # Function to donate a game
 def donate_game():
-    game_name = entry_game_name.get()
-    storage = entry_storage.get()
-    ram = entry_ram.get()
-    graphic_req = entry_graphic_req.get()
-    genre = entry_genre.get()
-    date_of_launch = entry_date_of_launch.get()
+    donate_window = tk.Toplevel(root)
+    donate_window.title("Donate a Game")
 
-    try:
-        # Insert game information into the database
-        st = "INSERT INTO GMAC (GAME_NAME, STORAGE, RAM, GRAPHIC_REQ, GENRE, DATE_OF_LAUNCH) VALUES (%s, %s, %s, %s, %s, %s)"
-        values = (game_name, storage, ram, graphic_req, genre, date_of_launch)
-        cr.execute(st, values)
-        cn.commit()
-        messagebox.showinfo("Success", "Game donated successfully.")
-        update_table()
-    except msq.Error as err:
-        messagebox.showerror("Error", f"Error: {err}")
+    labels = ["Game Name", "Storage", "RAM", "Graphic Req", "Genre", "Date of Launch"]
+    entries = []
+
+    for label_text in labels:
+        label = tk.Label(donate_window, text=label_text)
+        label.pack()
+
+        entry = tk.Entry(donate_window)
+        entry.pack()
+
+        entries.append(entry)
+
+    def submit():
+        try:
+            game_data = [entry.get() for entry in entries]
+            st = "INSERT INTO GMAC VALUES('{}','{}','{}','{}','{}','{}')".format(*game_data)
+            cr.execute(st)
+
+            cn.commit()
+            display_data_in_treeview()
+            write_to_csv()
+            donate_window.destroy()
+        except ValueError:
+            messagebox.showerror("Error", "Please enter valid values.")
+
+    submit_button = tk.Button(donate_window, text="Submit", command=submit)
+    submit_button.pack()
 
 # Function to search for a game
 def search_game():
-    search_page = ttk.Frame(main_notebook)
-    main_notebook.add(search_page, text="Search Game")
+    search_window = tk.Toplevel(root)
+    search_window.title("Search for a Game")
 
-    options_label = tk.Label(search_page, text="Select search options:")
-    options_label.pack()
+    label_aspect = tk.Label(search_window, text="Enter the aspect by which you want game suggestions:")
+    entry_aspect = tk.Entry(search_window)
+    label_aspect.pack()
+    entry_aspect.pack()
 
-    search_options = ["Game", "Genre", "Specification"]
-    combo_search_option = ttk.Combobox(search_page, values=search_options)
-    combo_search_option.set(search_options[0])
-    combo_search_option.pack()
+    def execute_search():
+        try:
+            aspect = int(entry_aspect.get())
+            if aspect == 1:
+                qr = input("Enter the name of the game: ")
+                cmd = "SELECT * FROM GMAC WHERE GAME_NAME='{}'".format(qr)
+            elif aspect == 2:
+                qr = input("Enter genre of game: ")
+                cmd = "SELECT * FROM GMAC WHERE GENRE='{}'".format(qr)
+            elif aspect == 3:
+                q1 = int(input("Enter the RAM required: "))
+                q2 = input("Enter if graphic card is required (Y/N): ")
+                q3 = int(input("Enter the storage required: "))
+                cmd = "SELECT * FROM GMAC WHERE STORAGE<={} AND RAM<={} AND GRAPHIC_REQ='{}'".format(q3, q1, q2)
 
-    search_button = tk.Button(search_page, text="Search", command=perform_search)
+            cr.execute(cmd)
+            result = cr.fetchall()
+            print("[GAME_ID, GAME_NAME, STORAGE, RAM, GRAPHIC_REQ, GENRE, DATE_OF_LAUNCH]")
+            for row in result:
+                print(row)
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid number.")
+
+    search_button = tk.Button(search_window, text="Search", command=execute_search)
     search_button.pack()
-
-    main_notebook.select(search_page)
-
-def perform_search():
-    selected_option = combo_search_option.get()
-
-    if selected_option == "Game":
-        search_game_by_name()
-    elif selected_option == "Genre":
-        search_game_by_genre()
-    elif selected_option == "Specification":
-        search_game_by_specifications()
-
-def search_game_by_name():
-    game_name = entry_search.get()
-    cmd = "SELECT * FROM GMAC WHERE GAME_NAME=%s"
-    cr.execute(cmd, (game_name,))
-    result = cr.fetchall()
-    display_search_result(result)
-
-def search_game_by_genre():
-    genre = entry_search.get()
-    cmd = "SELECT * FROM GMAC WHERE GENRE=%s"
-    cr.execute(cmd, (genre,))
-    result = cr.fetchall()
-    display_search_result(result)
-
-def search_game_by_specifications():
-    ram = entry_ram.get()
-    storage = entry_storage.get()
-    graphic_req = entry_graphic_req.get()
-    cmd = "SELECT * FROM GMAC WHERE RAM >= %s AND STORAGE >= %s AND GRAPHIC_REQ=%s"
-    cr.execute(cmd, (ram, storage, graphic_req))
-    result = cr.fetchall()
-    display_search_result(result)
-
-def display_search_result(result):
-    search_table.delete(*search_table.get_children())
-    for row in result:
-        search_table.insert("", "end", values=row)
 
 # Function to remove a game
 def remove_game():
-    game_name = entry_remove_game_name.get()
-    cmd = "DELETE FROM GMAC WHERE GAME_NAME=%s"
-    cr.execute(cmd, (game_name,))
-    cn.commit()
-    messagebox.showinfo("Game Removed", "Game removed successfully.")
-    update_table()
+    remove_window = tk.Toplevel(root)
+    remove_window.title("Remove a Game")
+
+    label_game_name = tk.Label(remove_window, text="Enter Game Name:")
+    entry_game_name = tk.Entry(remove_window)
+    label_game_name.pack()
+    entry_game_name.pack()
+
+    def execute_removal():
+        try:
+            game_name = entry_game_name.get()
+            cmd = "DELETE FROM GMAC WHERE GAME_NAME='{}'".format(game_name)
+            cr.execute(cmd)
+            cn.commit()
+            print("Game Deleted :(")
+            display_data_in_treeview()
+            write_to_csv()
+            remove_window.destroy()
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid number.")
+
+    remove_button = tk.Button(remove_window, text="Remove", command=execute_removal)
+    remove_button.pack()
 
 # Function to update a game
+# Function to update a game
 def update_game():
-    game_name = entry_update_game_name.get()
-    update_field = combo_update_field.get()
-    update_value = entry_update_value.get()
+    update_window = tk.Toplevel(root)
+    update_window.title("Update a Game")
 
-    if update_field == "Name":
-        cmd = "UPDATE GMAC SET GAME_NAME=%s WHERE GAME_NAME=%s"
-    elif update_field == "Genre":
-        cmd = "UPDATE GMAC SET GENRE=%s WHERE GAME_NAME=%s"
-    else:
-        cmd = "UPDATE GMAC SET STORAGE=%s WHERE GAME_NAME=%s"
+    # Fetch all game names from the database
+    cr.execute("SELECT GAME_NAME FROM GMAC")
+    game_names = [row[0] for row in cr.fetchall()]
 
-    cr.execute(cmd, (update_value, game_name))
-    cn.commit()
-    messagebox.showinfo("Game Updated", "Game information updated successfully.")
-    update_table()
+    # Dropdown menu for selecting the game
+    label_game_name = tk.Label(update_window, text="Select Game Name:")
+    selected_game_name = tk.StringVar(update_window)
+    game_name_dropdown = ttk.Combobox(update_window, textvariable=selected_game_name, values=game_names)
+    label_game_name.pack()
+    game_name_dropdown.pack()
 
-# Function to display all data
-def update_table():
-    exc = "SELECT * FROM GMAC"
-    cr.execute(exc)
-    dat = cr.fetchall()
+    # Entry fields for updating values
+    labels = ["Game Name", "Genre", "Storage", "RAM", "Graphic Req", "Date of Launch"]
+    entries = []
 
-    table.delete(*table.get_children())
-    for row in dat:
-        table.insert("", "end", values=row)
+    for label_text in labels:
+        label = tk.Label(update_window, text=label_text)
+        label.pack()
 
-# Create the main application window
-root = tk.Tk()
-root.title("Gaming Arcade Management")
-root.geometry("800x600")
+        entry = tk.Entry(update_window)
+        entry.pack()
 
-# Create a notebook to manage pages
-main_notebook = ttk.Notebook(root)
-main_notebook.pack(fill="both", expand=True)
+        entries.append(entry)
 
-# Create a frame to contain the table
-table_frame = ttk.Frame(root)
-table_frame.pack(fill="both", expand=True)
+    def execute_update():
+        try:
+            selected_name = selected_game_name.get()
+            updated_info = [entry.get() for entry in entries]
 
-# Create and pack the table
-table = create_table(table_frame)
+            fields = ["GAME_NAME", "GENRE", "STORAGE", "RAM", "GRAPHIC_REQ", "DATE_OF_LAUNCH"]
+            update_values = ", ".join([f"{field}='{value}'" for field, value in zip(fields, updated_info)])
 
-# Create and pack frames for different options
-donate_frame = ttk.Frame(main_notebook)
-search_frame = ttk.Frame(main_notebook)
-remove_frame = ttk.Frame(main_notebook)
-update_frame = ttk.Frame(main_notebook)
+            cmd = f"UPDATE GMAC SET {update_values} WHERE GAME_NAME='{selected_name}'"
+            cr.execute(cmd)
+            cn.commit()
+            display_data_in_treeview()
+            write_to_csv()
+            update_window.destroy()
+        except ValueError:
+            messagebox.showerror("Error", "Please enter valid values.")
 
-# Add frames to the notebook
-main_notebook.add(donate_frame, text="Donate Game")
-main_notebook.add(search_frame, text="Search Game")
-main_notebook.add(remove_frame, text="Remove Game")
-main_notebook.add(update_frame, text="Update Game")
-
-# Input fields and labels for donating a game
-label_game_name = tk.Label(donate_frame, text="Game Name")
-label_game_name.pack()
-entry_game_name = tk.Entry(donate_frame)
-entry_game_name.pack()
-
-storage_label = tk.Label(donate_frame, text="Storage")
-storage_label.pack()
-entry_storage = tk.Entry(donate_frame)
-entry_storage.pack()
-
-ram_label = tk.Label(donate_frame, text="RAM")
-ram_label.pack()
-entry_ram = tk.Entry(donate_frame)
-entry_ram.pack()
-
-graphic_label = tk.Label(donate_frame, text="Graphic Card (Y/N)")
-graphic_label.pack()
-entry_graphic_req = tk.Entry(donate_frame)
-entry_graphic_req.pack()
-
-genre_label = tk.Label(donate_frame, text="Genre")
-genre_label.pack()
-entry_genre = tk.Entry(donate_frame)
-entry_genre.pack()
-
-date_label = tk.Label(donate_frame, text="Date of Launch (yy-mm-dd)")
-date_label.pack()
-entry_date_of_launch = tk.Entry(donate_frame)
-entry_date_of_launch.pack()
-
-# Create and pack a donate button
-donate_button = tk.Button(donate_frame, text="Donate Game", command=donate_game)
-donate_button.pack()
-
-# Input fields and labels for removing a game
-remove_game_name_label = tk.Label(remove_frame, text="Game Name to Remove")
-remove_game_name_label.pack()
-entry_remove_game_name = tk.Entry(remove_frame)
-entry_remove_game_name.pack()
-
-# Create and pack a remove button
-remove_button = tk.Button(remove_frame, text="Remove Game", command=remove_game)
-remove_button.pack()
-
-# Input fields and labels for updating a game
-update_game_name_label = tk.Label(update_frame, text="Game Name to Update")
-update_game_name_label.pack()
-entry_update_game_name = tk.Entry(update_frame)
-entry_update_game_name.pack()
-
-update_field_label = tk.Label(update_frame, text="Field to Update")
-update_field_label.pack()
-update_options = ["Name", "Genre", "Storage"]
-combo_update_field = tk.StringVar()
-combo_update_field.set(update_options[0])
-update_field = tk.OptionMenu(update_frame, combo_update_field, *update_options)
-update_field.pack()
-
-update_value_label = tk.Label(update_frame, text="New Value")
-update_value_label.pack()
-entry_update_value = tk.Entry(update_frame)
-entry_update_value.pack()
-
-# Create and pack an update button
-update_button = tk.Button(update_frame, text="Update Game", command=update_game)
-update_button.pack()
-
-# Create a frame to contain the button to show the table
-show_table_frame = ttk.Frame(root)
-show_table_frame.pack()
-
-def show_table():
-    main_notebook.select(table_frame)
-# Create and pack a button to show the table
-show_table_button = tk.Button(show_table_frame, text="Show Table", command=show_table)
-show_table_button.pack()
-
-# Function to display the table
+    update_button = tk.Button(update_window, text="Update", command=execute_update)
+    update_button.pack()
 
 
-# Start the GUI application
+# GUI Buttons
+donate_button = tk.Button(options_frame, text="Donate a Game", command=donate_game, bg="#7FFFD4")
+search_button = tk.Button(options_frame, text="Search for a Game", command=search_game, bg="#7FFFD4")
+remove_button = tk.Button(options_frame, text="Remove a Game", command=remove_game, bg="#7FFFD4")
+update_button = tk.Button(options_frame, text="Update a Game", command=update_game, bg="#7FFFD4")
+show_data_button = tk.Button(options_frame, text="Show Data", command=display_data_in_treeview, bg="#7FFFD4")
+
+# GUI Packing
+donate_button.pack(side=tk.TOP, padx=10, pady=10)
+search_button.pack(side=tk.TOP, padx=10, pady=10)
+remove_button.pack(side=tk.TOP, padx=10, pady=10)
+update_button.pack(side=tk.TOP, padx=10, pady=10)
+show_data_button.pack(side=tk.TOP, padx=10, pady=10)
+
+# Display the initial data in the Treeview
+display_data_in_treeview()
+
+# Start the Tkinter main loop
 root.mainloop()
+
+# Close the CSV file and database connection when the application is closed
+cn.close()

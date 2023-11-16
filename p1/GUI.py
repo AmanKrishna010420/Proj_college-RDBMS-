@@ -98,8 +98,20 @@ def search_game():
                 cr.execute(query)
                 result = cr.fetchall()
                 print("[GAME_ID, GAME_NAME, STORAGE, RAM, GRAPHIC_REQ, GENRE, DATE_OF_LAUNCH]")
+                # for row in result:
+                    # print(row)
+                for record in tree.get_children():
+                    tree.delete(record)
+                tree.heading("#1", text="Game Name")
+                tree.heading("#2", text="Storage")
+                tree.heading("#3", text="RAM")
+                tree.heading("#4", text="Graphic Req")
+                tree.heading("#5", text="Genre")
+                tree.heading("#6", text="Date Of Launch")
+
                 for row in result:
-                    print(row)
+                    tree.insert("", "end", values=row)
+                            
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred: {str(e)}")
 
@@ -121,9 +133,18 @@ def search_game():
                 query = "SELECT * FROM GMAC WHERE GENRE='{}'".format(genre)
                 cr.execute(query)
                 result = cr.fetchall()
-                print("[GAME_ID, GAME_NAME, STORAGE, RAM, GRAPHIC_REQ, GENRE, DATE_OF_LAUNCH]")
+                for record in tree.get_children():
+                    tree.delete(record)
+                tree.heading("#1", text="Game Name")
+                tree.heading("#2", text="Storage")
+                tree.heading("#3", text="RAM")
+                tree.heading("#4", text="Graphic Req")
+                tree.heading("#5", text="Genre")
+                tree.heading("#6", text="Date Of Launch")
+
                 for row in result:
-                    print(row)
+                    tree.insert("", "end", values=row)
+           
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred: {str(e)}")
 
@@ -151,17 +172,21 @@ def search_game():
 
         def execute_search():
             try:
-                ram = int(entry_ram.get())
-                storage = int(entry_storage.get())
+                ram = entry_ram.get()
+                storage = entry_storage.get()
                 graphic_card = entry_graphic_card.get()
-                query = "SELECT * FROM GMAC WHERE STORAGE<={} AND RAM<={} AND GRAPHIC_REQ='{}'".format(storage, ram, graphic_card)
+                query = "SELECT * FROM GMAC WHERE STORAGE<='{}' AND RAM<='{}' AND GRAPHIC_REQ='{}'".format(storage, ram, graphic_card)
                 cr.execute(query)
                 result = cr.fetchall()
-                print("[GAME_ID, GAME_NAME, STORAGE, RAM, GRAPHIC_REQ, GENRE, DATE_OF_LAUNCH]")
+
+                # Clear existing data in the Treeview
+                for record in tree.get_children():
+                    tree.delete(record)
+
+                # Insert search results into the Treeview
                 for row in result:
-                    print(row)
-            except ValueError:
-                messagebox.showerror("Error", "Please enter valid numbers for RAM and Storage.")
+                    tree.insert("", "end", values=row)
+
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred: {str(e)}")
 
